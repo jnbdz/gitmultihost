@@ -1,5 +1,3 @@
-# Makefile
-
 include config.mk
 
 install:

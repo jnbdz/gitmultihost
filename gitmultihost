@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 #
-#/ gitmultihost - A tool for cloning git repositories using a selectable SSH host or changing the remote origin.
+#/ gitmultihost - A tool for handling git repositories with multiple SSH hosts.
 #/
 #/ Usage:
-#/   gitmultihost <repository-ssh-url> [destination-path]     - Clones a repository using a selectable SSH host
-#/   gitmultihost -c <repository-path>                        - Changes the remote origin of an existing repository
-#/   gitmultihost -h | -? | --help                            - Prints this help text and exits
-#/   gitmultihost -v | --version                              - Prints program version and exits
+#/   gitmultihost <git-command> [arguments...]
+#/
+#/   <git-command> can be any git command. If the command involves a repository URL, 
+#/   gitmultihost will prompt to select an SSH host for the operation using `fzf`.
+#/
+#/ Examples:
+#/   gitmultihost clone git@github.com:user/repo.git - Clones using a selectable SSH host
+#/   gitmultihost remote set-url origin git@github.com:user/repo.git - Changes remote origin using a selectable SSH host
 #/
 #/ OPTIONS:
-#/
-#/   -c, --correction <repository-path>                       - Change the remote origin of an existing repository
-#/   -h, -?, --help                                           - Show this help message and exit
-#/   -v, --version                                            - Show version information and exit
+#/   -h, --help - Show this help message and exit
+#/   -v, --version - Show version information and exit
 #/
 # gitmultihost is under a MIT style licence.
 # See LICENSE for the full text.
@@ -30,79 +32,48 @@ version() {
     echo "gitmultihost version $VERSION"
 }
 
-check_url() {
-    if [[ "$1" =~ ^https?:// ]]; then
-        echo "Error: This script only supports SSH URLs." >&2
-        echo "Usage: $0 <repository-ssh-url> [destination-path]" >&2
-        exit 2
-    fi
+select_host() {
+    grep "^Host " ~/.ssh/config | awk '{ print $2 }' | fzf --preview 'echo {}' --preview-window=down:3:hidden
 }
 
-change_remote_origin() {
-    local repo_path="$1"
-    
-    check_url "$repo_path"
+modify_url_with_host() {
+    local url="$1"
+    local selected_host=$(select_host)
 
-    local selected_host=$(grep "^Host " ~/.ssh/config | awk '{ print $2 }' | fzf --ansi --preview-window=hidden:wrap)
-    if [ -z "$selected_host" ]; then
-        echo "No host selected."
+    if [[ -z "$selected_host" ]]; then
+        echo "No host selected. Exiting." >&2
         exit 1
     fi
 
-    local new_url="git@${selected_host}:${repo_path}"
-    echo "Changing remote origin to ${new_url}..."
-    git remote set-url origin "$new_url"
-    echo "Remote origin changed successfully."
-}
-
-clone_repository() {
-    local original_url="$1"
-    local destination="${2:-.}" # Default to current directory if not provided
-    
-    check_url "$original_url"
-
-    local repo_path=$(echo "$original_url" | sed 's/.*:\/\///; s/.*@//')
-    local selected_host=$(grep "^Host " ~/.ssh/config | awk '{ print $2 }' | fzf --ansi --preview-window=hidden:wrap)
-    if [ -z "$selected_host" ]; then
-        echo "No host selected."
+    if [[ "$url" =~ ^https?:// ]]; then
+        url=$(echo "$url" | sed -r "s/https?:\/\/([^\/]+)/$selected_host/")
+    elif [[ "$url" =~ ^git@ ]]; then
+        url=$(echo "$url" | sed -r "s/git@([^:]+)/git@$selected_host/")
+    else
+        echo "Unsupported URL format: $url" >&2
         exit 1
     fi
 
-    local new_url="git@${selected_host}:${repo_path}"
-    echo "Cloning repository using SSH host ${selected_host} into ${destination}..."
-    git clone "$new_url" "$destination"
-    echo "Repository cloned successfully."
+    echo "$url"
 }
 
-while getopts ":h?v:c:" opt; do
-    case "${opt}" in
-        c)
-            if [ -z "$OPTARG" ]; then
-                echo "Error: No repository path provided for correction." >&2
-                exit 1
+main() {
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+        usage
+        exit 0
+    elif [[ "$1" == "-v" || "$1" == "--version" ]]; then
+        version
+        exit 0
+    else
+        local cmd=("$@")
+        for i in "${!cmd[@]}"; do
+            if [[ "${cmd[$i]}" =~ ^git@ || "${cmd[$i]}" =~ ^https?:// ]]; then
+                cmd[$i]=$(modify_url_with_host "${cmd[$i]}")
+                break
             fi
-            change_remote_origin "$OPTARG"
-            exit 0
-            ;;
-        h|\?)
-            usage
-            exit 0
-            ;;
-        v)
-            version
-            exit 0
-            ;;
-        *)
-            usage
-            exit 1
-            ;;
-    esac
-done
+        done
+        git "${cmd[@]}"
+    fi
+}
 
-shift $((OPTIND-1))
-
-if [ "$#" -eq 1 ] || [ "$#" -eq 2 ]; then
-    clone_repository "$@"
-else
-    usage
-fi
+main "$@"

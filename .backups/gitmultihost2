@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+# gitmultihost - A tool to facilitate the usage of `git` with multiple SSH hosts.
+# Utilizes `fzf` for host selection from ~/.ssh/config.
+
+VERSION="1.0.1"
+
+usage() {
+    echo "gitmultihost - Facilitate `git` usage with multiple hosts"
+    echo "Usage:"
+    echo "  gitmultihost clone <repository-url>               - Clones a repository using a selectable SSH host"
+    echo "  gitmultihost remote set-url origin <repository-url> - Changes the remote origin of an existing repository"
+    echo "  gitmultihost -h | --help                           - Shows this message"
+    echo "  gitmultihost -v | --version                        - Shows version information"
+}
+
+version() {
+    echo "gitmultihost version $VERSION"
+}
+
+select_host() {
+    grep "^Host " ~/.ssh/config | awk '{ print $2 }' | fzf --ansi --preview-window=hidden:wrap
+}
+
+execute_git_command() {
+    local git_command=$1
+    shift
+
+    # Determine if URL is present and needs host change
+    local repo_url="$1"
+    if [[ "$repo_url" =~ ^(https?|git@) ]]; then
+        # Extract the repository path
+        local repo_path=$(echo "$repo_url" | sed -E 's/.*:\/\/(.*)|.*/\1/')
+        local selected_host=$(select_host)
+        
+        if [ -z "$selected_host" ]; then
+            echo "No host selected."
+            exit 1
+        fi
+
+        local new_url="git@${selected_host}:$(echo $repo_path | sed 's/.*\///')"
+        echo "Using host ${selected_host} for operation."
+
+        # Construct the new command with the selected host
+        set -- "$new_url" "${@:2}"
+    fi
+
+    git "$git_command" "$@"
+}
+
+while getopts ":hv" opt; do
+    case "${opt}" in
+        h)
+            usage
+            exit 0
+            ;;
+        v)
+            version
+            exit 0
+            ;;
+        *)
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+shift $((OPTIND-1))
+
+# Process commands
+if [ "$#" -ge 2 ]; then
+    if [ "$1" = "clone" ] || ([ "$1" = "remote" ] && [ "$2" = "set-url" ]); then
+        execute_git_command "$@"
+    else
+        echo "Unsupported git operation for host selection."
+        exit 1
+    fi
+else
+    usage
+fi

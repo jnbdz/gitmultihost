@@ -1,40 +1,54 @@
-.TH gitmultihost 1 "2024-03-04" "gitmultihost version 1.0.1" "User Commands"
+.TH GITMULTIHOST 1 "2024/03/04" "1.0.1" "gitmultihost manual"
 .SH NAME
-gitmultihost \- clone git repositories using selectable SSH hosts or change the remote origin of an existing repository
+gitmultihost \- A tool for handling git repositories with multiple SSH hosts.
+
 .SH SYNOPSIS
 .B gitmultihost
-.RI [ "-c | --correction" ]
-.RI [ "repository-ssh-url" ]
-.RI [ "[destination-path]" ]
-.RI [ "-h | --help" ]
-.RI [ "-v | --version" ]
+[\fI<git-command>\fR] [\fIarguments...\fR]
+
 .SH DESCRIPTION
-.PP
-gitmultihost is a tool designed to streamline the cloning of git repositories when working with multiple SSH configurations, or changing the remote origin of an existing repository. It leverages fzf, a command-line fuzzy finder, to allow the user to select an SSH host defined in their \fI~/.ssh/config\fR file. This selection is then used to modify the SSH URL for the git clone command, or to change the remote origin URL.
+\fBgitmultihost\fR is a utility that facilitates managing git repositories with multiple SSH hosts. It integrates with the git command-line interface, allowing users to execute any git command. For commands that involve repository URLs, \fBgitmultihost\fR prompts the user to select an SSH host for the operation using \fBfzf\fR.
+
 .SH OPTIONS
 .TP
-.B -c, --correction
-Change the remote origin of an existing repository to the selected SSH host. Requires the path to the local git repository as an argument.
+.BI \-h\ ,\ \-\-help
+Show help message and exit.
+
 .TP
-.B -h, --help
-Display this help message and exit.
+.BI \-v\ ,\ \-\-version
+Show version information and exit.
+
+.SH EXAMPLES
+.PP
+Clone a repository using a selectable SSH host:
+.RS
+\fBgitmultihost clone git@github.com:user/repo.git\fR
+.RE
+.PP
+Change the remote origin URL of a repository using a selectable SSH host:
+.RS
+\fBgitmultihost remote set-url origin git@github.com:user/repo.git\fR
+.RE
+
+.SH FILES
 .TP
-.B -v, --version
-Display version information and exit.
-.SH USAGE
-.PP
-To clone a repository using a specific SSH host configuration, pass the repository's SSH URL as an argument, optionally followed by a destination path:
-.PP
-.B gitmultihost git@github.com:user/repo.git [destination-path]
-.PP
-To change the remote origin of an existing repository:
-.PP
-.B gitmultihost -c /path/to/repo
-.PP
-You will be prompted to select an SSH host from your configuration. After selecting, gitmultihost will proceed to clone the repository into the specified destination or change the remote origin as requested.
-.SH "SEE ALSO"
-.PP
-\fBgit(1)\fR, \fBssh-config(5)\fR, \fBfzf(1)\fR
+.B ~/.ssh/config
+SSH configuration file used by \fBgitmultihost\fR to list available hosts.
+
 .SH AUTHOR
 .PP
-Written by Jean-Nicolas Boulay Desjardins.
+Jean-Nicolas Boulay Desjardins
+
+.SH REPORTING BUGS
+.PP
+GitHub repository: https://github.com/jnbdz/gitmultihost
+
+.SH COPYRIGHT
+.PP
+This is open source software under the MIT license. See the LICENSE file for full license text.
+
+.SH "SEE ALSO"
+.PP
+.B git(1),
+.B ssh-config(5),
+.B fzf(1)

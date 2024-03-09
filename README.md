@@ -18,17 +18,9 @@ What follows is [`fzf`](https://github.com/junegunn/fzf) listing the hosts. Afte
 ### Changing the remote origin
 This is useful if there are already repositories that have not been configured to used one of the hosts.
 ```bash
-gitmultihost -c
-```
-or
-```bash
-gitmultihost --change-remote
-```
-or
-```bash
 gitmultihost remote set-url origin git@github.com:user/repo.git
 ```
 It will do the same as cloning and will ask you with [`fzf`](https://github.com/junegunn/fzf) what host you want to use.
 
 ### Any Other Command
-Those were just examples of what can be done with the tool. Any other `git` command can be used and every time there is a HTTPS or a SSH url it will givethe option to select a different host based on what is in `~/.ssh/config`.
+Those were just examples of what can be done with the tool. Any other `git` command can be used and every time there is a HTTPS or a SSH url it will give the option to select a different host based on what is in `~/.ssh/config`.

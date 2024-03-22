@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+#
+#/ gitmultihostsettings - A tool for handling git repositories with multiple SSH hosts.
+#/
+#/ Usage:
+#/   gitmultihostsettings <git-command> [arguments...]
+#/
+#/   <git-command> can be any git command. If the command involves a repository URL, 
+#/   gitmultihostsettings will prompt to select an SSH host for the operation using `fzf`.
+#/
+#/ Examples:
+#/   gitmultihostsettings clone git@github.com:user/repo.git - Clones using a selectable SSH host
+#/   gitmultihostsettings remote set-url origin git@github.com:user/repo.git - Changes remote origin using a selectable SSH host
+#/
+#/ OPTIONS:
+#/   -h, --help - Show this help message and exit
+#/   -v, --version - Show version information and exit
+#/
+# gitmultihostsettings is under a MIT style licence.
+# See LICENSE for the full text.
+#
+# This is open source! Please feel free to contribute.
+# https://github.com/jnbdz/gitmultihost
+
+VERSION="1.0.1"
+
+usage() {
+    grep '^#/' "$0" | cut -c 4-
+}
+
+version() {
+    echo "gitmultihostsettings version $VERSION"
+}
+
+list_config() {
+    echo "Listing SSH Configurations:"
+    echo "--------------------------"
+    grep -E "Host |HostName |IdentityFile " ~/.ssh/config || echo "No SSH configurations found."
+
+    echo ""
+    echo "Listing Git Configurations:"
+    echo "---------------------------"
+    # List includeIf directives and URL rewrites from .gitconfig
+    grep -A 2 "includeIf" ~/.gitconfig || echo "No includeIf configurations found."
+    grep -A 1 "url.*insteadOf" ~/.gitconfig || echo "No URL rewrite configurations found."
+    
+    # Optionally, list user configurations from .gitconfig-host files
+    echo ""
+    echo "Listing User Configurations in .gitconfig-* files:"
+    echo "-------------------------------------------------"
+    find ~ -name ".gitconfig-*" -exec echo "{}:" \; -exec cat {} \; || echo "No user configurations found."
+}
+
+add_config() {
+    # Extract command line arguments
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --name) shift; name="$1" ;;
+            --email) shift; email="$1" ;;
+            --dir) shift; dir="$1" ;;
+            --host) shift; host="$1" ;;
+            --host-name) shift; host_name="$1" ;;
+            --identity-file) shift; identity_file="$1" ;;
+        esac
+        shift
+    done
+
+    # Check and Add to .ssh/config
+    if grep -q "Host $host" ~/.ssh/config; then
+        echo "Entry for $host already exists in .ssh/config. Skipping..."
+    else
+        echo -e "Host $host\n     HostName $host_name\n     User git\n     IdentityFile $identity_file\n     IdentitiesOnly yes\n" >> ~/.ssh/config
+    fi
+
+    # Check and Add to .gitconfig
+    if git config --get-all includeIf."gitdir:$dir".path | grep -q "^\.gitconfig-$host$"; then
+        echo "Entry for $dir with .gitconfig-$host already exists in .gitconfig. Skipping..."
+    else
+        git config --global --add includeIf."gitdir:$dir".path .gitconfig-$host
+        # Ensure to append the URL rewrite only if it does not already exist
+        if ! grep -qF "[url \"git@$host:\"]" ~/.gitconfig; then
+            echo -e "[url \"git@$host:\"]\n    insteadOf = https://$host_name/\n" >> ~/.gitconfig
+        fi
+    fi
+
+    # Check before creating .gitconfig-host file
+    if [ -f "~/.gitconfig-$host" ]; then
+        echo "~/.gitconfig-$host already exists. Skipping creation..."
+    else
+        echo -e "[user]\n    email = $email\n    name = $name\n" > ~/.gitconfig-$host
+    fi
+}
+
+case "$1" in
+    add)
+        shift
+        add_config "$@"
+        ;;
+    remove)
+        echo "Remove functionality not implemented."
+        ;;
+    change)
+        echo "Change functionality not implemented."
+        ;;
+    list)
+        list_config
+        ;;
+    *)
+        echo "Usage: $0 {add|remove|change|list}"
+        exit 1
+        ;;
+esac
